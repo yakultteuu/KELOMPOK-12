@@ -1,0 +1,252 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+type CatatanTidur struct {
+	Tanggal   string
+	JamTidur  string
+	JamBangun string
+	Kualitas  int
+}
+
+var dataTidur []CatatanTidur
+
+func main() {
+	for {
+		fmt.Println("\n=== Aplikasi Pemantauan Tidur ===")
+		fmt.Println("1. Tambah Catatan Tidur")
+		fmt.Println("2. Lihat Catatan")
+		fmt.Println("3. Cari Catatan (Sequential)")
+		fmt.Println("4. Cari Catatan (Binary)")
+		fmt.Println("5. Urutkan (Selection Sort - Durasi)")
+		fmt.Println("6. Urutkan (Insertion Sort - Tanggal)")
+		fmt.Println("7. Laporan 7 Hari Terakhir")
+		fmt.Println("8. Rata-rata per Minggu")
+		fmt.Println("9. Keluar")
+		fmt.Print("Pilih menu: ")
+
+		var pilihan int
+		fmt.Scanln(&pilihan)
+
+		switch pilihan {
+		case 1:
+			tambahCatatan()
+		case 2:
+			lihatCatatan()
+		case 3:
+			cariSequential()
+		case 4:
+			cariBinary()
+		case 5:
+			urutkanDurasi()
+		case 6:
+			urutkanTanggal()
+		case 7:
+			laporan7Hari()
+		case 8:
+			rataMingguan()
+		case 9:
+			return
+		default:
+			fmt.Println("Pilihan tidak valid")
+		}
+	}
+}
+
+func tambahCatatan() {
+	var catatan CatatanTidur
+	fmt.Print("Tanggal (YYYY-MM-DD): ")
+	fmt.Scanln(&catatan.Tanggal)
+	fmt.Print("Jam Tidur (HH:MM): ")
+	fmt.Scanln(&catatan.JamTidur)
+	fmt.Print("Jam Bangun (HH:MM): ")
+	fmt.Scanln(&catatan.JamBangun)
+	fmt.Print("Kualitas (1-5): ")
+	fmt.Scanln(&catatan.Kualitas)
+
+	dataTidur = append(dataTidur, catatan)
+	fmt.Println("Catatan berhasil ditambahkan!")
+}
+
+func lihatCatatan() {
+	if len(dataTidur) == 0 {
+		fmt.Println("Belum ada catatan")
+		return
+	}
+
+	for i, catatan := range dataTidur {
+		durasi := hitungDurasi(catatan.JamTidur, catatan.JamBangun)
+		fmt.Printf("%d. %s | Tidur: %s | Bangun: %s | Durasi: %s | Kualitas: %d\n",
+			i+1, catatan.Tanggal, catatan.JamTidur, catatan.JamBangun, durasi, catatan.Kualitas)
+	}
+}
+
+func hitungDurasi(mulai, selesai string) string {
+	tidur := parseWaktu(mulai)
+	bangun := parseWaktu(selesai)
+	if bangun.Before(tidur) {
+		bangun = bangun.Add(24 * time.Hour)
+	}
+	durasi := bangun.Sub(tidur)
+	return fmt.Sprintf("%.0f jam %02d menit", durasi.Hours(), int(durasi.Minutes())%60)
+}
+
+func parseWaktu(waktu string) time.Time {
+	bagian := strings.Split(waktu, ":")
+	jam, _ := time.ParseDuration(bagian[0] + "h")
+	menit, _ := time.ParseDuration(bagian[1] + "m")
+	return time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC).Add(jam).Add(menit)
+}
+
+func cariSequential() {
+	fmt.Print("Cari tanggal (YYYY-MM-DD): ")
+	var tanggal string
+	fmt.Scanln(&tanggal)
+
+	ditemukan := false
+	for _, catatan := range dataTidur {
+		if catatan.Tanggal == tanggal {
+			durasi := hitungDurasi(catatan.JamTidur, catatan.JamBangun)
+			fmt.Printf("- %s | %s-%s | %s | Kualitas: %d\n",
+				catatan.Tanggal, catatan.JamTidur, catatan.JamBangun, durasi, catatan.Kualitas)
+			ditemukan = true
+		}
+	}
+
+	if !ditemukan {
+		fmt.Println("Tidak ditemukan")
+	}
+}
+
+func cariBinary() {
+	if len(dataTidur) == 0 {
+		fmt.Println("Belum ada catatan")
+		return
+	}
+
+	// Urutkan berdasarkan tanggal
+	salinan := make([]CatatanTidur, len(dataTidur))
+	copy(salinan, dataTidur)
+	insertionSort(salinan)
+
+	fmt.Print("Cari tanggal (YYYY-MM-DD): ")
+	var tanggal string
+	fmt.Scanln(&tanggal)
+
+	bawah, atas := 0, len(salinan)-1
+	for bawah <= atas {
+		tengah := (bawah + atas) / 2
+		if salinan[tengah].Tanggal == tanggal {
+			i := tengah
+			for i >= 0 && salinan[i].Tanggal == tanggal {
+				i--
+			}
+			for j := i + 1; j < len(salinan) && salinan[j].Tanggal == tanggal; j++ {
+				durasi := hitungDurasi(salinan[j].JamTidur, salinan[j].JamBangun)
+				fmt.Printf("- %s | %s-%s | %s | Kualitas: %d\n",
+					salinan[j].Tanggal, salinan[j].JamTidur, salinan[j].JamBangun, durasi, salinan[j].Kualitas)
+			}
+			return
+		} else if salinan[tengah].Tanggal < tanggal {
+			bawah = tengah + 1
+		} else {
+			atas = tengah - 1
+		}
+	}
+	fmt.Println("Tidak ditemukan")
+}
+
+func urutkanDurasi() {
+	n := len(dataTidur)
+	for i := 0; i < n-1; i++ {
+		min := i
+		for j := i + 1; j < n; j++ {
+			d1 := durasiJam(dataTidur[j].JamTidur, dataTidur[j].JamBangun)
+			d2 := durasiJam(dataTidur[min].JamTidur, dataTidur[min].JamBangun)
+			if d1 < d2 {
+				min = j
+			}
+		}
+		dataTidur[i], dataTidur[min] = dataTidur[min], dataTidur[i]
+	}
+	fmt.Println("Data diurutkan berdasarkan durasi tidur")
+}
+
+func urutkanTanggal() {
+	insertionSort(dataTidur)
+	fmt.Println("Data diurutkan berdasarkan tanggal")
+}
+
+func insertionSort(arr []CatatanTidur) {
+	for i := 1; i < len(arr); i++ {
+		kunci := arr[i]
+		j := i - 1
+		for j >= 0 && arr[j].Tanggal > kunci.Tanggal {
+			arr[j+1] = arr[j]
+			j--
+		}
+		arr[j+1] = kunci
+	}
+}
+
+func durasiJam(mulai, selesai string) float64 {
+	tidur := parseWaktu(mulai)
+	bangun := parseWaktu(selesai)
+	if bangun.Before(tidur) {
+		bangun = bangun.Add(24 * time.Hour)
+	}
+	return bangun.Sub(tidur).Hours()
+}
+
+func laporan7Hari() {
+	if len(dataTidur) == 0 {
+		fmt.Println("Belum ada catatan")
+		return
+	}
+
+	sekarang := time.Now()
+	jumlah := 0
+	for i := len(dataTidur) - 1; i >= 0 && jumlah < 7; i-- {
+		tanggal, err := time.Parse("2006-01-02", dataTidur[i].Tanggal)
+		if err != nil {
+			continue
+		}
+		if sekarang.Sub(tanggal).Hours() <= 7*24 {
+			durasi := hitungDurasi(dataTidur[i].JamTidur, dataTidur[i].JamBangun)
+			fmt.Printf("%s: %s (Kualitas: %d)\n", dataTidur[i].Tanggal, durasi, dataTidur[i].Kualitas)
+			jumlah++
+		}
+	}
+
+	if jumlah == 0 {
+		fmt.Println("Tidak ada catatan dalam 7 hari terakhir")
+	}
+}
+
+func rataMingguan() {
+	mingguan := make(map[string][]float64)
+
+	for _, catatan := range dataTidur {
+		tanggal, err := time.Parse("2006-01-02", catatan.Tanggal)
+		if err != nil {
+			continue
+		}
+		tahun, minggu := tanggal.ISOWeek()
+		kunci := fmt.Sprintf("%d-M%02d", tahun, minggu)
+		durasi := durasiJam(catatan.JamTidur, catatan.JamBangun)
+		mingguan[kunci] = append(mingguan[kunci], durasi)
+	}
+
+	for minggu, data := range mingguan {
+		total := 0.0
+		for _, d := range data {
+			total += d
+		}
+		rata := total / float64(len(data))
+		fmt.Printf("%s: Rata-rata %.1f jam (%d hari)\n", minggu, rata, len(data))
+	}
+}
